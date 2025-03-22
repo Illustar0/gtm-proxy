@@ -16,8 +16,12 @@ from starlette.status import HTTP_204_NO_CONTENT
 CONFIG_PATH = os.getenv(
     "CONFIG_PATH", os.path.dirname(__file__) + os.sep + "config.toml"
 )
-with open(CONFIG_PATH, "rb") as f:
-    config = tomllib.load(f)
+try:
+    with open(CONFIG_PATH, "rb") as f:
+        config = tomllib.load(f)
+# 配置不存在就使用默认配置
+except FileNotFoundError:
+    config = {}
 
 common_config = config.get("common", {})
 http_config = config.get("http", {})

@@ -1,0 +1,16 @@
+[common]
+useHost = true
+customHost = ""
+customGtmJsPath = "/js/jQuery.js"
+customAnalyticsCollectPath = "/admin/login"
+serverHeader = true
+
+[http]
+timeout = 10.0
+maxConnections = 1000
+cacheCapacity = 64
+
+[server]
+host = "127.0.0.1"
+port = 8000
+reload = true

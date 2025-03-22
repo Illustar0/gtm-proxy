@@ -1,0 +1,12 @@
+[project]
+name = "gtm-proxy"
+version = "0.1.0"
+description = "A simple Google Tag Manager Proxy."
+requires-python = ">=3.12"
+dependencies = [
+    "cachetools>=5.5.2",
+    "fastapi>=0.115.11",
+    "hishel>=0.1.1",
+    "locust>=2.33.2",
+    "uvicorn[standard]>=0.34.0",
+]

@@ -14,7 +14,12 @@ from starlette.responses import Response
 from starlette.status import HTTP_204_NO_CONTENT
 
 CONFIG_PATH = os.getenv(
-    "CONFIG_PATH", os.path.dirname(__file__) + os.sep + "config.toml"
+    "CONFIG_PATH",
+    os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    + os.sep
+    + "config"
+    + os.sep
+    + "config.toml",
 )
 try:
     with open(CONFIG_PATH, "rb") as f:

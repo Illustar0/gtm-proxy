@@ -1,8 +1,11 @@
 [common]
+# Whether to use the Host in the request header to replace
 useHost = true
+# Only takes effect when useHost = false, customize the Host used for replacement
 customHost = ""
 customGtmJsPath = "/js/jQuery.js"
 customAnalyticsCollectPath = "/admin/login"
+# Whether to include "X-Server: gtm-proxy" in the response header
 serverHeader = true
 
 [http]

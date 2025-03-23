@@ -89,7 +89,10 @@ def replace(data: str, old: Tuple, new: Tuple) -> str:
 async def get_gtm_js(id: str, request: Request) -> Response:
     headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
     query_params = dict(request.query_params)
-    query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
+    try:
+        query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
+    except:
+        pass
     gtm_js = await client.get(
         f"https://www.googletagmanager.com/gtm.js",
         params=query_params,
@@ -115,7 +118,10 @@ async def get_gtm_js(id: str, request: Request) -> Response:
 async def get_gtag_js(id: str, request: Request) -> Response:
     headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
     query_params = dict(request.query_params)
-    query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
+    try:
+        query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
+    except:
+        pass
     gtag_js = await client.get(
         "https://www.googletagmanager.com/gtag/js",
         params=query_params,

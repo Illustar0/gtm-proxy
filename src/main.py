@@ -11,7 +11,7 @@ from starlette.background import BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.status import HTTP_204_NO_CONTENT
+from starlette.status import HTTP_204_NO_CONTENT, HTTP_200_OK
 
 CONFIG_PATH = os.getenv(
     "CONFIG_PATH",
@@ -32,26 +32,32 @@ common_config = config.get("common", {})
 http_config = config.get("http", {})
 server_config = config.get("server", {})
 
-# common 配置
+# Common 配置
 USE_HOST = common_config.get("useHost", True)
 CUSTOM_HOST = common_config.get("customHost", "")
 CUSTOM_GTM_JS_PATH = common_config.get("customGtmJsPath", "/js/jQuery.js")
+CUSTOM_GTAG_JS_PATH = common_config.get(
+    "customGtagJsPath", "/js/bootstrap.bundle.min.js"
+)
+CUSTOM_GTAG_DESTINATION_PATH = common_config.get(
+    "customGtagDestinationPath", "/admin/dest"
+)
 CUSTOM_ANALYTICS_COLLECT_PATH = common_config.get(
     "customAnalyticsCollectPath", "/admin/login"
 )
 SERVER_HEADER = common_config.get("serverHeader", True)
 
-# http 配置
+# HTTP 配置
 HTTP_TIMEOUT = http_config.get("timeout", 10.0)
 MAX_CONNECTIONS = http_config.get("maxConnections", 1000)
 CACHE_CAPACITY = http_config.get("cacheCapacity", 64)
 
-# server 配置
+# Server 配置
 SERVER_HOST = server_config.get("host", "127.0.0.1")
 SERVER_PORT = server_config.get("port", 8000)
 SERVER_RELOAD = server_config.get("reload", True)
 
-app = FastAPI(title="GTM Proxy", version="0.1.0")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,  # noqa
@@ -81,11 +87,38 @@ def replace(data: str, old: Tuple, new: Tuple) -> str:
 
 @app.get(CUSTOM_GTM_JS_PATH)
 async def get_gtm_js(id: str, request: Request) -> Response:
+    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
     gtm_js = await client.get(
-        f"https://www.googletagmanager.com/gtag/js?id={str(base64.b64decode(id), 'utf-8')}"
+        f"https://www.googletagmanager.com/gtm.js?id={str(base64.b64decode(id), 'utf-8')}",
+        params=request.query_params,
+        headers=headers,
     )
     gtm_js_content = replace(
         gtm_js.text,
+        ("www.googletagmanager.com", "/gtag/js", "/gtag/destination"),
+        (
+            CUSTOM_HOST if USE_HOST is False else request.headers["Host"],
+            CUSTOM_GTAG_JS_PATH,
+            CUSTOM_GTAG_DESTINATION_PATH,
+        ),
+    )
+    return Response(
+        content=gtm_js_content,
+        media_type=gtm_js.headers["Content-Type"],
+        headers={"X-Server": "gtm-proxy"} if SERVER_HEADER else {},
+    )
+
+
+@app.get(CUSTOM_GTAG_JS_PATH)
+async def get_gtag_js(id: str, request: Request) -> Response:
+    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    gtag_js = await client.get(
+        f"https://www.googletagmanager.com/gtag/js?id={str(base64.b64decode(id), 'utf-8')}",
+        params=request.query_params,
+        headers=headers,
+    )
+    gtag_js_content = replace(
+        gtag_js.text,
         (
             '"+a+".google-analytics.com/g/collect',
             '"+(a?a+".":"")+"analytics.google.com/g/collect',
@@ -100,8 +133,8 @@ async def get_gtm_js(id: str, request: Request) -> Response:
         ),
     )
     return Response(
-        content=gtm_js_content,
-        media_type=gtm_js.headers["Content-Type"],
+        content=gtag_js_content,
+        media_type=gtag_js.headers["Content-Type"],
         headers={"X-Server": "gtm-proxy"} if SERVER_HEADER else {},
     )
 
@@ -126,6 +159,21 @@ async def get_collect_content(
         headers=headers,
     )
     return Response(status_code=HTTP_204_NO_CONTENT)
+
+
+@app.get(CUSTOM_GTAG_DESTINATION_PATH)
+async def get_collect_content(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    background_tasks.add_task(
+        client.get,
+        url="https://www.googletagmanager.com/gtag/destination",
+        params=request.query_params,
+        headers=headers,
+    )
+    return Response(status_code=HTTP_200_OK)
 
 
 if __name__ == "__main__":

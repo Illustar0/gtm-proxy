@@ -1,0 +1,7 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "baseBranches": ["main"],
+  "extends": [
+    "local>Illustar0/renovate-config"
+  ]
+}

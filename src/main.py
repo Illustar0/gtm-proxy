@@ -176,6 +176,11 @@ async def get_collect_content(
     return Response(status_code=HTTP_200_OK)
 
 
+@app.get("/")
+async def root():
+    return Response(content="Welcome to gtm-proxy.")
+
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",

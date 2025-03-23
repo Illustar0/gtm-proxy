@@ -19,17 +19,17 @@ GTM Proxy是一个轻量级的 Google Tag Manager 和 Google Analytics 代理服
 ## 使用方法
 
 ```bash
-docker run --restart always --name gtm-proxy \
+docker run -d --restart always --name gtm-proxy \
         -p 8000:8000 \
         -v /path/to/config.toml:/app/config/config.toml \
         illustar0/gtm-proxy:latest
 ```
 或
 ```bash
-docker run --restart always --name gtm-proxy \
+docker run -d --restart always --name gtm-proxy \
         -p 8000:8000 \
         -v /path/to/config.toml:/app/config/config.toml \
-        ghcr.io/Illustar0/gtm-proxy:latest
+        ghcr.io/illustar0/gtm-proxy:latest
 ```
 
 ### 配置选项

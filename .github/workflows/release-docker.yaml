@@ -58,13 +58,9 @@ jobs:
 
       - name: Setup | Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        env:
-          BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
       - name: Publish | Build and push Docker images
         uses: docker/build-push-action@v6.15.0
-        env:
-          BUILDX_NO_DEFAULT_ATTESTATIONS: 1
         with:
           platforms: ${{ matrix.platform }}
           push: true

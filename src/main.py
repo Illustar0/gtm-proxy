@@ -88,9 +88,11 @@ def replace(data: str, old: Tuple, new: Tuple) -> str:
 @app.get(CUSTOM_GTM_JS_PATH)
 async def get_gtm_js(id: str, request: Request) -> Response:
     headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    query_params = dict(request.query_params)
+    query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
     gtm_js = await client.get(
-        f"https://www.googletagmanager.com/gtm.js?id={str(base64.b64decode(id), 'utf-8')}",
-        params=request.query_params,
+        f"https://www.googletagmanager.com/gtm.js",
+        params=query_params,
         headers=headers,
     )
     gtm_js_content = replace(
@@ -112,9 +114,11 @@ async def get_gtm_js(id: str, request: Request) -> Response:
 @app.get(CUSTOM_GTAG_JS_PATH)
 async def get_gtag_js(id: str, request: Request) -> Response:
     headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    query_params = dict(request.query_params)
+    query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
     gtag_js = await client.get(
-        f"https://www.googletagmanager.com/gtag/js?id={str(base64.b64decode(id), 'utf-8')}",
-        params=request.query_params,
+        "https://www.googletagmanager.com/gtag/js",
+        params=query_params,
         headers=headers,
     )
     gtag_js_content = replace(

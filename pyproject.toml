@@ -1,7 +1,9 @@
 [project]
 name = "gtm-proxy"
-version = "0.1.0"
+version = "0.5.0"
 description = "A simple Google Tag Manager Proxy."
+authors = [{ name = "Illustar0", email = "me@illustar0.com" }]
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "cachetools>=5.5.2",
@@ -10,3 +12,13 @@ dependencies = [
     "locust>=2.33.2",
     "uvicorn[standard]>=0.34.0",
 ]
+
+[tool.semantic_release]
+version_toml = [
+    "pyproject.toml:project.version"
+]
+commit_message = "chore: release v{version}"
+
+[tool.semantic_release.changelog]
+mode = "update"
+template_dir="config/release-templates/"

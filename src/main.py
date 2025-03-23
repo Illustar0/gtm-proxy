@@ -140,7 +140,7 @@ async def get_gtag_js(id: str, request: Request) -> Response:
 
 
 @app.post(CUSTOM_ANALYTICS_COLLECT_PATH)
-async def get_collect_content(
+async def send_collect_request(
     request: Request,
     background_tasks: BackgroundTasks,
 ):
@@ -162,7 +162,7 @@ async def get_collect_content(
 
 
 @app.get(CUSTOM_GTAG_DESTINATION_PATH)
-async def get_collect_content(
+async def send_destination_request(
     request: Request,
     background_tasks: BackgroundTasks,
 ):

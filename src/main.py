@@ -53,7 +53,7 @@ MAX_CONNECTIONS = http_config.get("maxConnections", 1000)
 CACHE_CAPACITY = http_config.get("cacheCapacity", 64)
 
 # Server 配置
-SERVER_HOST = server_config.get("host", "127.0.0.1")
+SERVER_HOST = server_config.get("host", "0.0.0.0")
 SERVER_PORT = server_config.get("port", 8000)
 SERVER_RELOAD = server_config.get("reload", True)
 

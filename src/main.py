@@ -30,6 +30,7 @@ DEFAULT_CONFIG = {
     "Common": {
         "use_host": True,
         "custom_host": "",
+        "real_ip_header": "x-real-ip",
         "custom_gtm_js_path": "/js/jQuery.js",
         "custom_gtag_js_path": "/js/bootstrap.bundle.min.js",
         "custom_gtag_destination_path": "/admin/dest",
@@ -48,6 +49,8 @@ class CommonConfigModel(BaseModel):
     """Whether to use the Host in the request header directly"""
     custom_host: str = Field("", description="Custom Host")
     """Custom Host"""
+    real_ip_header: str = Field("x-real-ip", description="Real IP Header")
+    """Real IP Header"""
     custom_gtm_js_path: str = Field(
         "/js/jQuery.js", description="Google Tag Manager JavaScript Path"
     )
@@ -157,7 +160,18 @@ def replace(data: str, old: Tuple, new: Tuple) -> str:
 
 @app.get(config.data.Common.custom_gtm_js_path)
 async def get_gtm_js(id: str, request: Request) -> Response:
-    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    headers_to_exclude = {
+        config.data.Common.real_ip_header.lower(),
+        "x-forwarded-for",
+        "x-real-ip",
+        "x-forwarded-proto",
+        "host",
+        "content-length",  # 通常需要移除
+        "transfer-encoding",  # 通常需要移除
+    }
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in headers_to_exclude
+    }
     query_params = dict(request.query_params)
     try:
         query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
@@ -188,7 +202,18 @@ async def get_gtm_js(id: str, request: Request) -> Response:
 
 @app.get(config.data.Common.custom_gtag_js_path)
 async def get_gtag_js(id: str, request: Request) -> Response:
-    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    headers_to_exclude = {
+        config.data.Common.real_ip_header.lower(),
+        "x-forwarded-for",
+        "x-real-ip",
+        "x-forwarded-proto",
+        "host",
+        "content-length",  # 通常需要移除
+        "transfer-encoding",  # 通常需要移除
+    }
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in headers_to_exclude
+    }
     query_params = dict(request.query_params)
     try:
         query_params["id"] = str(base64.b64decode(query_params["id"]), "utf-8")
@@ -234,10 +259,21 @@ async def send_collect_request(
 
     params = {
         **base_params,
-        "uip": request.client.host,
-        "_uip": request.client.host,
+        "uip": request.headers[config.data.Common.real_ip_header.lower()],
+        "_uip": request.headers[config.data.Common.real_ip_header.lower()],
     }
-    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    headers_to_exclude = {
+        config.data.Common.real_ip_header.lower(),
+        "x-forwarded-for",
+        "x-real-ip",
+        "x-forwarded-proto",
+        "host",
+        "content-length",  # 通常需要移除
+        "transfer-encoding",  # 通常需要移除
+    }
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in headers_to_exclude
+    }
     background_tasks.add_task(
         client.post,
         url="https://www.google-analytics.com/g/collect",
@@ -252,7 +288,18 @@ async def send_destination_request(
     request: Request,
     background_tasks: BackgroundTasks,
 ):
-    headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
+    headers_to_exclude = {
+        config.data.Common.real_ip_header.lower(),
+        "x-forwarded-for",
+        "x-real-ip",
+        "x-forwarded-proto",
+        "host",
+        "content-length",  # 通常需要移除
+        "transfer-encoding",  # 通常需要移除
+    }
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in headers_to_exclude
+    }
     background_tasks.add_task(
         client.get,
         url="https://www.googletagmanager.com/gtag/destination",

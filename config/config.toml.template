@@ -1,6 +1,7 @@
 [Common]
 use_host = true
 custom_host = ""
+real_ip_header="x-real-ip"
 custom_gtm_js_path = "/js/jQuery.js"
 custom_gtag_js_path = "/js/bootstrap.bundle.min.js"
 custom_gtag_destination_path = "/admin/dest"

@@ -1,0 +1,19 @@
+[Common]
+use_host = true
+custom_host = ""
+custom_gtm_js_path = "/js/jQuery.js"
+custom_gtag_js_path = "/js/bootstrap.bundle.min.js"
+custom_gtag_destination_path = "/admin/dest"
+custom_analytics_collect_path = "/admin/login"
+server_header = true
+
+[Http]
+timeout = 10.0
+max_connections = 1000
+cache_capacity = 64
+
+[Server]
+host = "0.0.0.0"
+port = 8000
+reload = true
+workers = 1

@@ -1,15 +1,16 @@
 import base64
-import datetime
 import os
 import time
-
-import uvicorn
 import tomllib
 from typing import Tuple
+
+import uvicorn
 from cachetools import FIFOCache, cached
 from fastapi import FastAPI
 from hishel import AsyncCacheClient, AsyncInMemoryStorage
 from httpx import Limits
+from loguru import logger
+from pydantic import BaseModel, Field
 from starlette.background import BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -24,42 +25,108 @@ CONFIG_PATH = os.getenv(
     + os.sep
     + "config.toml",
 )
-try:
-    with open(CONFIG_PATH, "rb") as f:
-        config = tomllib.load(f)
-# 配置不存在就使用默认配置
-except FileNotFoundError:
-    config = {}
 
-common_config = config.get("common", {})
-http_config = config.get("http", {})
-server_config = config.get("server", {})
+DEFAULT_CONFIG = {
+    "Common": {
+        "use_host": True,
+        "custom_host": "",
+        "custom_gtm_js_path": "/js/jQuery.js",
+        "custom_gtag_js_path": "/js/bootstrap.bundle.min.js",
+        "custom_gtag_destination_path": "/admin/dest",
+        "custom_analytics_collect_path": "/admin/login",
+        "server_header": True,
+    },
+    "Http": {"timeout": 10.0, "max_connections": 1000, "cache_capacity": 64},
+    "Server": {"host": "0.0.0.0", "port": 8000, "reload": True, "workers": 1},
+}
 
-# Common 配置
-USE_HOST = common_config.get("useHost", True)
-CUSTOM_HOST = common_config.get("customHost", "")
-CUSTOM_GTM_JS_PATH = common_config.get("customGtmJsPath", "/js/jQuery.js")
-CUSTOM_GTAG_JS_PATH = common_config.get(
-    "customGtagJsPath", "/js/bootstrap.bundle.min.js"
-)
-CUSTOM_GTAG_DESTINATION_PATH = common_config.get(
-    "customGtagDestinationPath", "/admin/dest"
-)
-CUSTOM_ANALYTICS_COLLECT_PATH = common_config.get(
-    "customAnalyticsCollectPath", "/admin/login"
-)
-SERVER_HEADER = common_config.get("serverHeader", True)
 
-# HTTP 配置
-HTTP_TIMEOUT = http_config.get("timeout", 10.0)
-MAX_CONNECTIONS = http_config.get("maxConnections", 1000)
-CACHE_CAPACITY = http_config.get("cacheCapacity", 64)
+class CommonConfigModel(BaseModel):
+    use_host: bool = Field(
+        True, description="Whether to use the Host in the request header directly"
+    )
+    """Whether to use the Host in the request header directly"""
+    custom_host: str = Field("", description="Custom Host")
+    """Custom Host"""
+    custom_gtm_js_path: str = Field(
+        "/js/jQuery.js", description="Google Tag Manager JavaScript Path"
+    )
+    """Google Tag Manager JavaScript Path"""
+    custom_gtag_js_path: str = Field(
+        "/js/bootstrap.bundle.min.js", description="Gtag JavaScript Path"
+    )
+    """Gtag JavaScript Path"""
+    custom_gtag_destination_path: str = Field(
+        "/admin/dest", description="Gtag Destination Path"
+    )
+    """Gtag Destination Path"""
+    custom_analytics_collect_path: str = Field(
+        "/admin/login", description="Analytics Collect Path"
+    )
+    """Analytics Collect Path"""
+    server_header: bool = Field(
+        True,
+        description='Whether to carry {"X-Server": "gtm-proxy"} in the response header',
+    )
+    """Whether to carry {"X--Server": "gtm-proxy"} in the response header"""
+    cache_capacity: int = Field(64, description="Cache capacity")
+    """Cache capacity"""
 
-# Server 配置
-SERVER_HOST = server_config.get("host", "0.0.0.0")
-SERVER_PORT = server_config.get("port", 8000)
-SERVER_RELOAD = server_config.get("reload", True)
 
+class HttpConfigModel(BaseModel):
+    timeout: float = Field(10.0, description="Timeout")
+    """Timeout"""
+    max_connections: int = Field(1000, description="Maximum number of connections")
+    """Maximum number of connections"""
+    cache_capacity: int = Field(64, description="Cache capacity")
+    """Cache capacity"""
+
+
+class ServerConfigModel(BaseModel):
+    host: str = Field("0.0.0.0", description="Server bind address")
+    """Server bind address"""
+    port: int = Field(8000, description="Server port")
+    """Server port"""
+    reload: bool = Field(True, description="Enable auto-reload for development")
+    """Enable auto-reload for development"""
+    workers: int = Field(1, description="Number of worker processes")
+    """Number of worker processes"""
+
+
+class GtmProxyConfig(BaseModel):
+    Common: CommonConfigModel
+    Http: HttpConfigModel
+    Server: ServerConfigModel
+
+
+class AppConfig:
+    def __init__(self, config_path: str | os.PathLike = "./config.toml"):
+        super().__init__()
+        self.config_path = config_path
+        self.data: GtmProxyConfig | None = None
+
+        if os.path.exists(self.config_path):
+            self.load()
+        else:
+            # noinspection PyArgumentList
+            self.data = GtmProxyConfig.model_validate(DEFAULT_CONFIG)
+            logger.info(f"Configuration loaded from default config")
+
+    def load(self) -> None:
+        """加载配置"""
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                toml_data = tomllib.loads(f.read())
+            # 💩
+            # noinspection PyTypeChecker
+            toml_data = dict(toml_data)
+            self.data = GtmProxyConfig.model_validate(toml_data)
+            logger.info(f"Configuration loaded from {self.config_path}")
+        except Exception as e:
+            logger.error(f"Failed to load config: {e}")
+
+
+config = AppConfig(config_path=CONFIG_PATH)
 app = FastAPI()
 
 app.add_middleware(
@@ -71,14 +138,14 @@ app.add_middleware(
 )
 
 client = AsyncCacheClient(
-    limits=Limits(max_connections=MAX_CONNECTIONS),
-    storage=AsyncInMemoryStorage(capacity=CACHE_CAPACITY),
-    timeout=HTTP_TIMEOUT,
+    limits=Limits(max_connections=config.data.Http.max_connections),
+    storage=AsyncInMemoryStorage(capacity=config.data.Http.cache_capacity),
+    timeout=config.data.Http.timeout,
 )
 
 
 # 优化缓存函数
-@cached(cache=FIFOCache(maxsize=CACHE_CAPACITY))
+@cached(cache=FIFOCache(maxsize=config.data.Common.cache_capacity))
 def replace(data: str, old: Tuple, new: Tuple) -> str:
     """
     替换字符串中的内容，使用缓存提高性能
@@ -88,7 +155,7 @@ def replace(data: str, old: Tuple, new: Tuple) -> str:
     return data
 
 
-@app.get(CUSTOM_GTM_JS_PATH)
+@app.get(config.data.Common.custom_gtm_js_path)
 async def get_gtm_js(id: str, request: Request) -> Response:
     headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
     query_params = dict(request.query_params)
@@ -105,19 +172,21 @@ async def get_gtm_js(id: str, request: Request) -> Response:
         gtm_js.text,
         ("www.googletagmanager.com", "/gtag/js", "/gtag/destination"),
         (
-            CUSTOM_HOST if USE_HOST is False else request.headers["Host"],
-            CUSTOM_GTAG_JS_PATH,
-            CUSTOM_GTAG_DESTINATION_PATH,
+            config.data.Common.custom_host
+            if config.data.Common.use_host is False
+            else request.headers["Host"],
+            config.data.Common.custom_gtag_js_path,
+            config.data.Common.custom_gtag_destination_path,
         ),
     )
     return Response(
         content=gtm_js_content,
         media_type=gtm_js.headers["Content-Type"],
-        headers={"X-Server": "gtm-proxy"} if SERVER_HEADER else {},
+        headers={"X-Server": "gtm-proxy"} if config.data.Common.server_header else {},
     )
 
 
-@app.get(CUSTOM_GTAG_JS_PATH)
+@app.get(config.data.Common.custom_gtag_js_path)
 async def get_gtag_js(id: str, request: Request) -> Response:
     headers = dict(request.headers).pop("X-Forwarded-For".lower(), None)
     query_params = dict(request.query_params)
@@ -137,22 +206,26 @@ async def get_gtag_js(id: str, request: Request) -> Response:
             '"+(a?a+".":"")+"analytics.google.com/g/collect',
         ),
         (
-            CUSTOM_HOST + CUSTOM_ANALYTICS_COLLECT_PATH
-            if USE_HOST is False
-            else request.headers["Host"] + CUSTOM_ANALYTICS_COLLECT_PATH,
-            CUSTOM_HOST + CUSTOM_ANALYTICS_COLLECT_PATH
-            if USE_HOST is False
-            else request.headers["Host"] + CUSTOM_ANALYTICS_COLLECT_PATH,
+            config.data.Common.custom_host
+            + config.data.Common.custom_analytics_collect_path
+            if config.data.Common.use_host is False
+            else request.headers["Host"]
+            + config.data.Common.custom_analytics_collect_path,
+            config.data.Common.custom_host
+            + config.data.Common.custom_analytics_collect_path
+            if config.data.Common.use_host is False
+            else request.headers["Host"]
+            + config.data.Common.custom_analytics_collect_path,
         ),
     )
     return Response(
         content=gtag_js_content,
         media_type=gtag_js.headers["Content-Type"],
-        headers={"X-Server": "gtm-proxy"} if SERVER_HEADER else {},
+        headers={"X-Server": "gtm-proxy"} if config.data.Common.server_header else {},
     )
 
 
-@app.post(CUSTOM_ANALYTICS_COLLECT_PATH)
+@app.post(config.data.Common.custom_analytics_collect_path)
 async def send_collect_request(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -174,7 +247,7 @@ async def send_collect_request(
     return Response(status_code=HTTP_204_NO_CONTENT)
 
 
-@app.get(CUSTOM_GTAG_DESTINATION_PATH)
+@app.get(config.data.Common.custom_gtag_destination_path)
 async def send_destination_request(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -202,10 +275,11 @@ async def root():
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host=SERVER_HOST,
-        port=SERVER_PORT,
+        host=config.data.Server.host,
+        port=config.data.Server.port,
+        workers=config.data.Server.workers,
         server_header=False,
         proxy_headers=True,
         forwarded_allow_ips="*",
-        reload=SERVER_RELOAD,
+        reload=config.data.Server.reload,
     )

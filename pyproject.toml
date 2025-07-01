@@ -9,6 +9,8 @@ dependencies = [
     "cachetools>=5.5.2",
     "fastapi>=0.115.11",
     "hishel>=0.1.1",
+    "loguru>=0.7.3",
+    "pydantic>=2.10.6",
     "uvicorn[standard]>=0.34.0",
 ]
 

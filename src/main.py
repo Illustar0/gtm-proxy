@@ -1,5 +1,8 @@
 import base64
+import datetime
 import os
+import time
+
 import uvicorn
 import tomllib
 from typing import Tuple
@@ -184,6 +187,11 @@ async def send_destination_request(
         headers=headers,
     )
     return Response(status_code=HTTP_200_OK)
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": int(round(time.time() * 1000))}
 
 
 @app.get("/")
